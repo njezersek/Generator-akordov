@@ -1,18 +1,10 @@
 import itertools
+import re
 from types import SimpleNamespace
 
 names = ['c','cis','d','dis','e','f','fis','g','gis','a','b','h']
 
-shapes = {
-	'dur': [0,4,7],
-	'mol': [0,3,7],
-	'dim': [0,3,6],
-	'dur7': [0,4,7,10],
-	'mol7': [0,3,7,11],
-	'dim7': [0,3,6,9],
-}
-
-nameToId = lambda name: names.index(str.lower(name))
+nameToId = lambda name: names.index(name.lower())
 idToName = lambda id: names[id]
 shift = lambda note, delta: (note + delta) % len(names)
 
@@ -21,13 +13,11 @@ frets = 12
 
 
 def getChords(root, shape):
-	chordRoot = nameToId(root)
-	chordShape = shapes.get(shape)
-	chordNotes = [shift(chordRoot, d) for d in chordShape] # note v akordu glede na obliko
+	notes = [shift(root, d) for d in shape] # note v akordu glede na obliko
 
 	# možne prečke za vsako struno
 	deltaStrings = [
-		[d for d in range(frets) if shift(string,d) in chordNotes] 
+		[d for d in range(frets) if shift(string,d) in notes] 
 		for string in strings
 	]
 
@@ -51,7 +41,7 @@ def getChords(root, shape):
 def showChord(chord):
 	start = chord.start if chord.start > 2 else 1
 	end = max(chord.end, start+4)
-	print("    E D A G H E  ")
+	print("    E A D G H E  ")
 	for fr in range(start, end+1):
 		if chord.barre == fr:
 			line = "XXXXXXXXXXXXX"
@@ -64,9 +54,32 @@ def showChord(chord):
 	print(f"span: {chord.span}, start: {chord.start}, fingers: {chord.fingers}, score: {chord.score} \n")
 
 
+def decodeChord(s):
+	m = re.findall(r"^([cdefgahCDEFGAH])(is|IS|s|S|es|ES)?(|dim|Dim|DIM|sus|Sus|SUS)?(maj|Maj|MAJ)?(\d)?\/?([cdefgahCDEFGAH])?$", s)[0]
+
+	root = names.index(m[0].lower())
+	modificators = {'is': 1, 'es': -1, 's': -1}
+	d = modificators.get(m[1].lower(), 0)
+	root = shift(root, d)
+
+	shape = set()
+	if m[2].lower() == 'dim': shape = {0, 3, 6}
+	elif m[2].lower() == 'sus': shape = {0, 5, 7}
+	else:
+		if str.isupper(m[0]): shape = {0,4,7}
+		else: shape = {0,3,7}
+
+	intervals = {'2': 1, 'maj2': 2, '3': 3, 'maj3': 4, '4': 5, '5': 7, '6': 8, 'maj6': 9, '7': 10, 'maj7': 11}
+
+	shape.add(intervals.get((m[3]+m[4]).lower(), 0))
+
+	return root, shape
+
+
 while True:
-	root = input("Root note: ")
-	shape = input("Type: ")
+	s = input("Enter chord name: ")
+
+	root, shape = decodeChord(s)
 
 	chords = getChords(root, shape)
 
